@@ -1,0 +1,48 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { NextResponse } from "next/server";
+
+// अपनी फ्री Gemini API की यहां रखें (Google AI Studio से मुफ्त मिलती है)
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+export async function POST(req) {
+  try {
+    const { prompt } = await req.json();
+
+    if (!prompt) {
+      return NextResponse.json({ error: "प्रॉम्प्ट खाली नहीं हो सकता!" }, { status: 400 });
+    }
+
+    const lowerPrompt = prompt.toLowerCase();
+
+    // 1. अगर यूजर फोटो बनवाने को कहे (जैसे: "generate image of...", "draw a...")
+    if (
+      lowerPrompt.includes("generate image") || 
+      lowerPrompt.includes("draw") || 
+      lowerPrompt.includes("photo of") ||
+      lowerPrompt.includes("तस्वीर बनाओ")
+    ) {
+      // Pollinations.ai एक मुफ्त सर्विस है जो बिना किसी API Key के तुरंत फोटो बना देती है
+      const encodedPrompt = encodeURIComponent(prompt);
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}`;
+
+      return NextResponse.json({
+        type: "image",
+        content: imageUrl,
+      });
+    }
+
+    // 2. आम बातचीत या कोडिंग के सवालों के लिए Google Gemini का फ्री मॉडल इस्तेमाल करें
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+
+    return NextResponse.json({
+      type: "text",
+      content: responseText,
+    });
+
+  } catch (error) {
+    console.error("API Error:", error);
+    return NextResponse.json({ error: "सर्वर में कुछ गड़बड़ हो गई! कृपया पुनः प्रयास करें।" }, { status: 500 });
+  }
+}
